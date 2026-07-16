@@ -1,0 +1,1 @@
+- [Auth module decisions](auth-module.md) — Supabase auth with platform-aware storage; NativeWind metro disabled due to pnpm resolution bug.
