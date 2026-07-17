@@ -24,3 +24,4 @@ timeoutMs = 20000
 [userenv.shared]
 EXPO_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qcGFmaHNqcmRhcXprbHF0Y2FkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDczNDcsImV4cCI6MjA5OTc4MzM0N30.zpFbMpLvf2WqX6mOflmF46u5SrKn0yntYbwrHz35-pg"
 EXPO_PUBLIC_SUPABASE_URL = "https://ojpafhsjrdaqzklqtcad.supabase.co"
+EXPO_PUBLIC_GOOGLE_CLIENT_ID = "649091127303-hqbkf0chl3949up253o1a99peinqa2rt.apps.googleusercontent.com"
