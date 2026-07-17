@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle, type StyleProp } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 export type CardVariant = 'default' | 'surface' | 'elevated';
@@ -9,7 +9,7 @@ export interface CardProps {
   children: React.ReactNode;
   variant?: CardVariant;
   padding?: CardPadding;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 const PADDING_MAP: Record<string, number> = {
