@@ -83,7 +83,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isInitialized) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const onIndex = segments[0] === undefined || segments[0] === 'index';
+    const onIndex = segments[0] === undefined;
     const isAuthed = !!session;
 
     if (isAuthed && inAuthGroup) {

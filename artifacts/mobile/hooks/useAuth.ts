@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
@@ -114,14 +115,53 @@ export function useResetPassword() {
 }
 
 // ─── Google OAuth ───────────────────────────────────────────────────────────
+//
+// Supabase-proxied PKCE flow (no native Google SDK required):
+//
+//   1. Supabase generates a Google OAuth URL with a PKCE code_challenge.
+//   2. expo-web-browser opens it in a secure in-app browser session.
+//   3. User authenticates with Google.
+//   4. Google → Supabase server → redirects to `redirectTo?code=<auth_code>`.
+//   5. openAuthSessionAsync intercepts the redirect (matches `redirectTo` scheme)
+//      and returns result.url to the app without leaving the browser.
+//   6. We extract `code` from result.url and call exchangeCodeForSession.
+//   7. Supabase completes the PKCE exchange and issues a session.
+//   8. The existing onAuthStateChange listener in _layout.tsx picks up the
+//      session and the auth guard redirects the user to the tabs.
 
 export function useSignInWithGoogle() {
   return useMutation({
     mutationFn: async () => {
-      const url = await authService.getGoogleOAuthUrl();
-      if (url) {
-        await WebBrowser.openAuthSessionAsync(url);
+      // createURL returns the correct scheme for the current environment:
+      //   - Production / EAS build: smartfitai://
+      //   - Expo Go development:    exp://<host>/--/
+      const redirectTo = Linking.createURL('/');
+
+      const url = await authService.getGoogleOAuthUrl(redirectTo);
+      if (!url) throw new Error('Failed to generate Google OAuth URL');
+
+      const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
+
+      if (result.type !== 'success') {
+        // User cancelled or browser was dismissed — not an error.
+        return;
       }
+
+      // Extract the PKCE authorization code from the redirect URL.
+      const parsed = new URL(result.url);
+      const code = parsed.searchParams.get('code');
+
+      if (!code) {
+        // Supabase may have redirected with an error.
+        const errorDescription = parsed.searchParams.get('error_description');
+        throw new Error(errorDescription ?? 'Google sign-in failed: no code returned');
+      }
+
+      // Exchange the code for a Supabase session (PKCE verifier was stored
+      // in-memory by supabase-js during step 1).
+      await authService.exchangeGoogleCode(code);
+
+      // The onAuthStateChange listener in app/_layout.tsx handles navigation.
     },
   });
 }

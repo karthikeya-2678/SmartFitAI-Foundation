@@ -58,15 +58,35 @@ export const authService = {
     if (error) throw error;
   },
 
-  // ─── OAuth ───────────────────────────────────────────────────────────────────
+  // ─── Google OAuth (Supabase-proxied, PKCE) ────────────────────────────────────
+  //
+  // Flow:
+  //   1. Call this to get a one-time Google OAuth URL (Supabase generates a PKCE
+  //      code_challenge and embeds it in the URL).
+  //   2. Open the URL in expo-web-browser (openAuthSessionAsync).
+  //   3. After the user authenticates, Google → Supabase → redirectTo?code=xxx.
+  //   4. Call exchangeGoogleCode(code) to complete the PKCE exchange.
+  //
+  // `redirectTo` must be registered in Supabase Dashboard → Authentication →
+  // URL Configuration → Redirect URLs.  Use Linking.createURL('/') so it is
+  // scheme-aware (smartfitai:// on device, exp:// in Expo Go).
 
-  getGoogleOAuthUrl: async () => {
+  getGoogleOAuthUrl: async (redirectTo: string) => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { skipBrowserRedirect: true },
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
     });
     if (error) throw error;
     return data.url;
+  },
+
+  exchangeGoogleCode: async (code: string) => {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    return data;
   },
 
   // ─── Session ─────────────────────────────────────────────────────────────────

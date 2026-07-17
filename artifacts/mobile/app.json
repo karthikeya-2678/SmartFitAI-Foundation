@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "SmartFitAI",
-    "slug": "mobile",
+    "slug": "smartfitai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "smartfitai",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -15,15 +15,34 @@
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "com.smartfitaii.app",
       "infoPlist": {
-        "UIUserInterfaceStyle": "Dark"
+        "UIUserInterfaceStyle": "Dark",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["smartfitai"]
+          }
+        ]
       }
     },
     "android": {
+      "package": "com.smartfitaii.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#0F172A"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "smartfitai"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
