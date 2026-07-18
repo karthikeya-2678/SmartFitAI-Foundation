@@ -26,7 +26,9 @@ export type EquipmentType =
   | 'machine'
   | 'cables'
   | 'resistance_band'
-  | 'bodyweight';
+  | 'bodyweight'
+  | 'kettlebell'
+  | 'pull_up_bar';
 
 export interface Exercise {
   id: string;
@@ -101,4 +103,25 @@ export interface WeeklyStats {
   totalMinutes: number;
   totalCalories: number;
   completionRate: number;
+}
+
+// ─── Active Workout Session ───────────────────────────────────────────────────
+
+/** A single set result logged during an active session. */
+export interface LoggedSet {
+  reps: number;
+  weight: number; // kg
+  completed: boolean;
+  completedAt?: string;
+}
+
+/** Full state of an in-progress workout session. */
+export interface WorkoutSession {
+  workout: Workout;
+  startedAt: string;
+  currentExerciseIndex: number;
+  /** key: `${workoutExerciseId}_${setIndex}` */
+  loggedSets: Record<string, LoggedSet>;
+  isResting: boolean;
+  restDuration: number; // seconds
 }
