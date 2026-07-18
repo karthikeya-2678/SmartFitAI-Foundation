@@ -159,20 +159,27 @@ export function useSignInWithGoogle() {
       // Extract the PKCE authorization code from the redirect URL.
       // Supabase returns it as a query param (?code=xxx) in PKCE flow, but
       // also check hash fragments (#code=xxx) as a fallback for older configs.
-      const parsed = new URL(result.url);
-      let code = parsed.searchParams.get('code');
+      //
+      // NOTE: new URL() is NOT used here — Hermes (React Native's JS engine)
+      // does not correctly parse custom schemes such as exp:// or smartfitai://,
+      // causing searchParams to be empty even when the query string is present.
+      // URLSearchParams on its own works correctly on all platforms.
+      const rawUrl = result.url;
+      const queryString = rawUrl.includes('?') ? rawUrl.split('?')[1] ?? '' : '';
+      const queryPart = queryString.includes('#') ? queryString.split('#')[0] : queryString;
+      const hashPart = rawUrl.includes('#') ? rawUrl.split('#')[1] ?? '' : '';
 
-      if (!code) {
-        // Try hash fragment fallback (e.g. exp://...#code=xxx)
-        const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-        code = hashParams.get('code');
-      }
+      const queryParams = new URLSearchParams(queryPart);
+      const hashParams = new URLSearchParams(hashPart);
+
+      let code = queryParams.get('code') ?? hashParams.get('code') ?? null;
 
       if (!code) {
         // Supabase may have redirected with an error.
         const errorDescription =
-          parsed.searchParams.get('error_description') ??
-          new URLSearchParams(parsed.hash.replace(/^#/, '')).get('error_description');
+          queryParams.get('error_description') ??
+          hashParams.get('error_description') ??
+          null;
         throw new Error(errorDescription ?? 'Google sign-in failed: no code returned');
       }
 

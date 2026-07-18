@@ -31,6 +31,14 @@ Use plain `getDefaultConfig` + StyleSheet for components; NativeWind preset in b
 **Why:** PNPM symlink structure + Metro's node_modules resolution conflict.
 **How to apply:** Don't re-enable withNativeWind until PNPM hoisting is resolved.
 
+## Hermes URL parsing: never use `new URL()` with custom schemes
+In React Native (Hermes engine), `new URL('exp://...')` or `new URL('smartfitai://...')`
+does not correctly extract `searchParams` — they come back empty even when the query string
+is present. Use plain string splitting + `URLSearchParams` instead.
+**Why:** Hermes's URL implementation only handles http/https schemes properly.
+**How to apply:** Any code that parses OAuth redirect URLs (exp://, smartfitai://) must split
+on `?` and `#` manually, then pass each part to `new URLSearchParams(part)`.
+
 ## Auth guard architecture
 Root `_layout.tsx` → `AuthProvider` handles:
 - Session initialization (Supabase onAuthStateChange + getSession)
