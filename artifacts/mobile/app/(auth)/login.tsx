@@ -247,7 +247,12 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.googleBtn}
               activeOpacity={0.8}
-              onPress={() => googleLogin.mutate()}
+              onPress={() =>
+                googleLogin.mutate(undefined, {
+                  onError: (e: any) =>
+                    Alert.alert('Google Sign-In Failed', e.message ?? 'Please try again.'),
+                })
+              }
               disabled={googleLogin.isPending}
             >
               <Text style={styles.googleIcon}>G</Text>

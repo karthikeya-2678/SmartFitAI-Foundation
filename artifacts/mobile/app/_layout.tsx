@@ -55,10 +55,22 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       setInitialized();
     };
 
-    // Subscribe first so we don't miss rapid events
+    // Subscribe first so we don't miss rapid events.
+    // Only update session state for events that actually change auth status —
+    // calling setSession(null) on every event (including TOKEN_REFRESHED with
+    // a valid session) can race against the Google OAuth exchange and log the
+    // user out immediately after they sign in.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        setSession(newSession);
+      (event, newSession) => {
+        if (
+          event === 'SIGNED_IN' ||
+          event === 'TOKEN_REFRESHED' ||
+          event === 'USER_UPDATED' ||
+          event === 'SIGNED_OUT' ||
+          event === 'INITIAL_SESSION'
+        ) {
+          setSession(newSession);
+        }
         finish(newSession);
       },
     );

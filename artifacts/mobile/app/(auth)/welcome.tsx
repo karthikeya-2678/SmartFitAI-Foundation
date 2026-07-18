@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   Dimensions,
   Image,
   StyleSheet,
@@ -82,7 +83,15 @@ const statStyles = StyleSheet.create({
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { mutate: signInGoogle, isPending: googleLoading } = useSignInWithGoogle();
+  const googleAuth = useSignInWithGoogle();
+  const { isPending: googleLoading } = googleAuth;
+
+  const handleGoogleSignIn = () => {
+    googleAuth.mutate(undefined, {
+      onError: (e: any) =>
+        Alert.alert('Google Sign-In Failed', e.message ?? 'Please try again.'),
+    });
+  };
 
   // Entrance animations
   const heroOpacity = useSharedValue(0);
@@ -176,7 +185,7 @@ export default function WelcomeScreen() {
           <TouchableOpacity
             style={styles.googleBtn}
             activeOpacity={0.8}
-            onPress={() => signInGoogle()}
+            onPress={handleGoogleSignIn}
             disabled={googleLoading}
           >
             <Text style={styles.googleIcon}>G</Text>

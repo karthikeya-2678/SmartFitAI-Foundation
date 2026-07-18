@@ -126,12 +126,17 @@ export function useResetPassword() {
 //      and returns result.url to the app without leaving the browser.
 //   6. We extract `code` from result.url and call exchangeCodeForSession.
 //   7. Supabase completes the PKCE exchange and issues a session.
-//   8. The existing onAuthStateChange listener in _layout.tsx picks up the
-//      session and the auth guard redirects the user to the tabs.
+//   8. We navigate directly to /(tabs); onAuthStateChange in _layout.tsx also
+//      picks up the session as a safety net.
+
+type GoogleSignInResult = 'authenticated' | 'cancelled';
 
 export function useSignInWithGoogle() {
+  const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
+
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<GoogleSignInResult> => {
       // createURL returns the correct scheme for the current environment:
       //   - Production / EAS build: smartfitai://
       //   - Expo Go development:    exp://<host>/--/
@@ -140,28 +145,58 @@ export function useSignInWithGoogle() {
       const url = await authService.getGoogleOAuthUrl(redirectTo);
       if (!url) throw new Error('Failed to generate Google OAuth URL');
 
+      // maybeCompleteAuthSession is required on Android to dismiss the browser
+      // when the redirect is intercepted by the app scheme.
+      WebBrowser.maybeCompleteAuthSession();
+
       const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
 
       if (result.type !== 'success') {
-        // User cancelled or browser was dismissed — not an error.
-        return;
+        // User cancelled or browser was dismissed — not an error, no navigation.
+        return 'cancelled';
       }
 
       // Extract the PKCE authorization code from the redirect URL.
+      // Supabase returns it as a query param (?code=xxx) in PKCE flow, but
+      // also check hash fragments (#code=xxx) as a fallback for older configs.
       const parsed = new URL(result.url);
-      const code = parsed.searchParams.get('code');
+      let code = parsed.searchParams.get('code');
+
+      if (!code) {
+        // Try hash fragment fallback (e.g. exp://...#code=xxx)
+        const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+        code = hashParams.get('code');
+      }
 
       if (!code) {
         // Supabase may have redirected with an error.
-        const errorDescription = parsed.searchParams.get('error_description');
+        const errorDescription =
+          parsed.searchParams.get('error_description') ??
+          new URLSearchParams(parsed.hash.replace(/^#/, '')).get('error_description');
         throw new Error(errorDescription ?? 'Google sign-in failed: no code returned');
       }
 
       // Exchange the code for a Supabase session (PKCE verifier was stored
-      // in-memory by supabase-js during step 1).
-      await authService.exchangeGoogleCode(code);
+      // in storage by supabase-js during step 1).
+      const { session } = await authService.exchangeGoogleCode(code);
 
-      // The onAuthStateChange listener in app/_layout.tsx handles navigation.
+      if (!session) {
+        throw new Error('Google sign-in failed: no session returned after code exchange');
+      }
+
+      // Eagerly update Zustand so the auth guard and any subscribers are in
+      // sync before we navigate — don't rely solely on onAuthStateChange
+      // which may fire slightly later.
+      setSession(session);
+
+      return 'authenticated';
+    },
+    onSuccess: (status) => {
+      // Only navigate when the user actually authenticated.
+      // Cancelled flows return 'cancelled' and must not redirect.
+      if (status === 'authenticated') {
+        router.replace('/(tabs)');
+      }
     },
   });
 }
