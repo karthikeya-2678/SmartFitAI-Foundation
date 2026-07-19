@@ -104,7 +104,7 @@ export function RecentActivityCard({ logs, isLoading, onSeeAll, delay = 550 }: R
                 </View>
                 <View style={styles.logRight}>
                   <Text style={[styles.logDate, { color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }]}>
-                    {timeAgo(log.startedAt)}
+                    {timeAgo(log.startedAt ?? log.completedAt)}
                   </Text>
                   {log.rating ? (
                     <View style={styles.ratingRow}>

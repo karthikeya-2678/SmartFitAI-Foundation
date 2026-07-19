@@ -125,6 +125,13 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        {/* Workout screens */}
+        <Stack.Screen name="workout/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="workout/active" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+        <Stack.Screen name="workout/complete" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+        <Stack.Screen name="workout/history" options={{ animation: 'slide_from_right' }} />
+        {/* Exercise screens */}
+        <Stack.Screen name="exercise/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
     </>

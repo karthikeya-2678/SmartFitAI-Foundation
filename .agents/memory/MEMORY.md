@@ -1,1 +1,2 @@
 - [Auth module decisions](auth-module.md) — Supabase auth with platform-aware storage; NativeWind metro disabled due to pnpm resolution bug.
+- [Workout module architecture](workout-module.md) — Full workout module complete: data layer, Zustand store, components, and all screens.

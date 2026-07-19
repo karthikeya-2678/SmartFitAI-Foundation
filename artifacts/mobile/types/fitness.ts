@@ -76,16 +76,34 @@ export interface Workout {
   createdAt: string;
 }
 
+/** Lightweight per-set record stored inside a WorkoutLog. */
+export interface LoggedSetRecord {
+  reps?: number;
+  weight?: number;
+  duration?: number;
+  completed: boolean;
+}
+
+/** Lightweight per-exercise record stored inside a WorkoutLog. */
+export interface LoggedExerciseRecord {
+  exerciseId: string;
+  exerciseName: string;
+  sets: LoggedSetRecord[];
+}
+
 export interface WorkoutLog {
   id: string;
   workoutId: string;
   workoutName: string;
-  userId: string;
-  startedAt: string;
-  completedAt?: string;
-  durationMinutes?: number;
+  userId?: string;
+  startedAt?: string;
+  completedAt: string;
+  durationMinutes: number;
   caloriesBurned?: number;
-  exercises: WorkoutExercise[];
+  totalSets?: number;
+  totalReps?: number;
+  totalVolume?: number;
+  exercises?: LoggedExerciseRecord[];
   notes?: string;
   mood?: 1 | 2 | 3 | 4 | 5;
   rating?: 1 | 2 | 3 | 4 | 5;

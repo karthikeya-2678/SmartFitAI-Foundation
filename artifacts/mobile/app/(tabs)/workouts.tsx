@@ -1,238 +1,332 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useMemo, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+} from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { useDebounce } from '@/hooks/useDebounce';
+import { WorkoutCard, CategoryBanner, HistoryCard } from '@/components/workout';
+import { useWorkoutStore } from '@/store/useWorkoutStore';
+import { useAppStore } from '@/store/useAppStore';
+import { WORKOUTS, filterWorkouts } from '@/data/workouts';
+import type { Workout, ExerciseCategory } from '@/types/fitness';
+import { CATEGORY_CONFIG, DIFFICULTY_FILTER_OPTIONS } from '@/constants/workout';
 
-const CATEGORIES = ['All', 'Strength', 'Cardio', 'HIIT', 'Yoga', 'Core'];
-
-const DIFFICULTY_COLOR: Record<string, string> = {
-  Beginner: '#22C55E',
-  Intermediate: '#F59E0B',
-  Advanced: '#EF4444',
-};
-
-const WORKOUTS = [
-  { id: '1', name: 'Full Body Strength', category: 'Strength', duration: 45, difficulty: 'Intermediate', exercises: 10, calories: 380 },
-  { id: '2', name: 'HIIT Blast', category: 'HIIT', duration: 25, difficulty: 'Advanced', exercises: 8, calories: 450 },
-  { id: '3', name: 'Morning Yoga Flow', category: 'Yoga', duration: 30, difficulty: 'Beginner', exercises: 12, calories: 150 },
-  { id: '4', name: 'Sprint Intervals', category: 'Cardio', duration: 35, difficulty: 'Advanced', exercises: 6, calories: 520 },
-  { id: '5', name: 'Core Crusher', category: 'Core', duration: 20, difficulty: 'Intermediate', exercises: 9, calories: 200 },
-  { id: '6', name: 'Upper Body Power', category: 'Strength', duration: 50, difficulty: 'Advanced', exercises: 11, calories: 420 },
-  { id: '7', name: 'Low Impact Cardio', category: 'Cardio', duration: 40, difficulty: 'Beginner', exercises: 7, calories: 280 },
-  { id: '8', name: 'Yoga for Recovery', category: 'Yoga', duration: 45, difficulty: 'Beginner', exercises: 14, calories: 120 },
-];
+const CATEGORIES = Object.keys(CATEGORY_CONFIG) as ExerciseCategory[];
 
 export default function WorkoutsScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const debouncedSearch = useDebounce(search, 250);
+  const { isFavorite, toggleFavorite, favoriteIds } = useWorkoutStore();
+  const { workoutLogs } = useAppStore();
 
-  const filtered = WORKOUTS.filter((w) => {
-    const matchesCategory = activeCategory === 'All' || w.category === activeCategory;
-    const matchesSearch = w.name.toLowerCase().includes(debouncedSearch.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeDifficulty, setActiveDifficulty] = useState<string>('all');
+  const [showHistory, setShowHistory] = useState(false);
+
+  const filtered = useMemo(
+    () =>
+      filterWorkouts({
+        category: activeCategory === 'all' ? undefined : activeCategory,
+        difficulty: activeDifficulty === 'all' ? undefined : activeDifficulty,
+        search: search.trim() || undefined,
+      }),
+    [activeCategory, activeDifficulty, search],
+  );
+
+  const favorites = useMemo(
+    () => WORKOUTS.filter((w) => favoriteIds.includes(w.id)),
+    [favoriteIds],
+  );
+
+  const recentLogs = useMemo(() => workoutLogs.slice(0, 5), [workoutLogs]);
+
+  const handleWorkoutPress = useCallback((workout: Workout) => {
+    router.push(`/workout/${workout.id}`);
+  }, []);
+
+  const noFilters = activeCategory === 'all' && activeDifficulty === 'all' && !search.trim();
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+        <View>
+          <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+            Workouts
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+            {WORKOUTS.length} programs ready
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.historyBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push('/workout/history')}
+          activeOpacity={0.7}
+        >
+          <Feather name="clock" size={16} color={colors.primary} />
+          <Text style={[styles.historyBtnText, { color: colors.primary, fontFamily: 'Inter_600SemiBold' }]}>
+            History
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 100 },
-        ]}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-          Workouts
-        </Text>
-
         {/* Search */}
-        <Input
-          placeholder="Search workouts..."
-          value={search}
-          onChangeText={setSearch}
-          containerStyle={styles.search}
-          leftIcon={<Feather name="search" size={18} color={colors.mutedForeground} />}
-        />
+        <Animated.View entering={FadeInDown.delay(60).duration(400)}>
+          <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="search" size={16} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text, fontFamily: 'Inter_400Regular' }]}
+              placeholder="Search workouts…"
+              placeholderTextColor={colors.mutedForeground}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Feather name="x" size={15} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
 
-        {/* Category chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryContent}
-        >
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              onPress={() => setActiveCategory(cat)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: activeCategory === cat ? colors.primary : colors.surface,
-                  borderColor: activeCategory === cat ? colors.primary : colors.border,
-                },
-              ]}
-              activeOpacity={0.75}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  {
-                    color:
-                      activeCategory === cat ? colors.primaryForeground : colors.textSecondary,
-                    fontFamily: 'Inter_600SemiBold',
-                  },
-                ]}
-              >
-                {cat}
+        {/* Categories horizontal scroll */}
+        {noFilters && (
+          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              Browse by Category
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
+              {CATEGORIES.map((cat) => (
+                <CategoryBanner
+                  key={cat}
+                  category={cat}
+                  onPress={() => setActiveCategory(cat)}
+                />
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* Favorites */}
+        {noFilters && favorites.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(140).duration(400)}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+                ❤️ Favorites
               </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.favoritesScroll}>
+              {favorites.map((w, i) => (
+                <View key={w.id} style={styles.favCard}>
+                  <WorkoutCard
+                    workout={w}
+                    isFavorite
+                    onPress={() => handleWorkoutPress(w)}
+                    onToggleFavorite={toggleFavorite}
+                    index={i}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
 
-        <Text
-          style={[
-            styles.countText,
-            { color: colors.mutedForeground, fontFamily: 'Inter_400Regular' },
-          ]}
-        >
-          {filtered.length} workout{filtered.length !== 1 ? 's' : ''}
-        </Text>
+        {/* Filter chips */}
+        <Animated.View entering={FadeInDown.delay(160).duration(400)}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              {noFilters ? 'All Workouts' : `Results (${filtered.length})`}
+            </Text>
+            {!noFilters && (
+              <TouchableOpacity
+                onPress={() => { setActiveCategory('all'); setActiveDifficulty('all'); setSearch(''); }}
+              >
+                <Text style={[styles.clearText, { color: colors.primary, fontFamily: 'Inter_600SemiBold' }]}>
+                  Clear
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-        {/* Workout cards */}
-        {filtered.map((w) => (
-          <WorkoutCard key={w.id} workout={w} colors={colors} />
-        ))}
+          {/* Category chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+            {(['all', ...CATEGORIES] as const).map((cat) => {
+              const label = cat === 'all' ? 'All' : CATEGORY_CONFIG[cat].label;
+              const active = activeCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.card,
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => setActiveCategory(cat)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? colors.primaryForeground : colors.textSecondary, fontFamily: 'Inter_600SemiBold' },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-        {filtered.length === 0 && (
-          <View style={styles.empty}>
+          {/* Difficulty chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.chipsScroll, { marginTop: 8 }]}>
+            {DIFFICULTY_FILTER_OPTIONS.map((opt) => {
+              const active = activeDifficulty === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? colors.secondary : colors.card,
+                      borderColor: active ? colors.secondary : colors.border,
+                    },
+                  ]}
+                  onPress={() => setActiveDifficulty(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? colors.primaryForeground : colors.textSecondary, fontFamily: 'Inter_600SemiBold' },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+
+        {/* Workout list */}
+        {filtered.length === 0 ? (
+          <Animated.View entering={FadeInDown.duration(300)} style={styles.empty}>
             <Feather name="search" size={36} color={colors.mutedForeground} />
-            <Text
-              style={[
-                styles.emptyText,
-                { color: colors.mutedForeground, fontFamily: 'Inter_400Regular' },
-              ]}
-            >
+            <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
               No workouts found
             </Text>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Try adjusting your search or filters
+            </Text>
+          </Animated.View>
+        ) : (
+          <View style={styles.list}>
+            {filtered.map((workout, i) => (
+              <WorkoutCard
+                key={workout.id}
+                workout={workout}
+                isFavorite={isFavorite(workout.id)}
+                onPress={() => handleWorkoutPress(workout)}
+                onToggleFavorite={toggleFavorite}
+                index={i}
+              />
+            ))}
           </View>
         )}
+
+        {/* Recent history teaser */}
+        {noFilters && recentLogs.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+                Recent Activity
+              </Text>
+              <TouchableOpacity onPress={() => router.push('/workout/history')}>
+                <Text style={[styles.clearText, { color: colors.primary, fontFamily: 'Inter_600SemiBold' }]}>
+                  See all
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {recentLogs.map((log) => (
+              <HistoryCard key={log.id} log={log} />
+            ))}
+          </Animated.View>
+        )}
+
+        <View style={{ height: 32 }} />
       </ScrollView>
-    </View>
-  );
-}
-
-function WorkoutCard({ workout, colors }: { workout: (typeof WORKOUTS)[0]; colors: ReturnType<typeof useColors> }) {
-  const diffColor = DIFFICULTY_COLOR[workout.difficulty] ?? colors.primary;
-
-  return (
-    <TouchableOpacity activeOpacity={0.8} style={styles.cardTouch}>
-      <Card style={styles.workoutCard}>
-        <View style={styles.badgeRow}>
-          <View style={[styles.badge, { backgroundColor: colors.primary + '22' }]}>
-            <Text style={[styles.badgeText, { color: colors.primary, fontFamily: 'Inter_600SemiBold' }]}>
-              {workout.category}
-            </Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: diffColor + '22' }]}>
-            <Text style={[styles.badgeText, { color: diffColor, fontFamily: 'Inter_600SemiBold' }]}>
-              {workout.difficulty}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={[styles.workoutName, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-          {workout.name}
-        </Text>
-
-        <View style={styles.metaRow}>
-          <MetaChip icon="clock" label={`${workout.duration} min`} colors={colors} />
-          <MetaChip icon="list" label={`${workout.exercises} exercises`} colors={colors} />
-          <MetaChip icon="zap" label={`${workout.calories} kcal`} colors={colors} />
-        </View>
-
-        <View
-          style={[
-            styles.startBtn,
-            { backgroundColor: colors.primary, borderRadius: colors.radius - 4 },
-          ]}
-        >
-          <Text
-            style={[
-              styles.startBtnText,
-              { color: colors.primaryForeground, fontFamily: 'Inter_700Bold' },
-            ]}
-          >
-            Start Workout
-          </Text>
-          <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
-        </View>
-      </Card>
-    </TouchableOpacity>
-  );
-}
-
-function MetaChip({
-  icon,
-  label,
-  colors,
-}: {
-  icon: string;
-  label: string;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={styles.metaChip}>
-      <Feather name={icon as 'clock'} size={13} color={colors.textSecondary} />
-      <Text
-        style={[styles.metaChipText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}
-      >
-        {label}
-      </Text>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 20 },
-  title: { fontSize: 28, marginBottom: 18 },
-  search: { marginBottom: 18 },
-  categoryScroll: { marginBottom: 16 },
-  categoryContent: { paddingRight: 4, gap: 10 },
-  chip: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 24,
-    borderWidth: 1.5,
-  },
-  chipText: { fontSize: 13 },
-  countText: { fontSize: 13, marginBottom: 14 },
-  cardTouch: { marginBottom: 14 },
-  workoutCard: { gap: 12 },
-  badgeRow: { flexDirection: 'row', gap: 8 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  badgeText: { fontSize: 11 },
-  workoutName: { fontSize: 19 },
-  metaRow: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
-  metaChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaChipText: { fontSize: 13 },
-  startBtn: {
+  safe: { flex: 1 },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    marginTop: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  startBtnText: { fontSize: 14 },
-  empty: { alignItems: 'center', gap: 14, paddingTop: 60 },
-  emptyText: { fontSize: 15 },
+  title: { fontSize: 28 },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  historyBtnText: { fontSize: 13 },
+  scroll: { paddingHorizontal: 20 },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  searchInput: { flex: 1, fontSize: 14 },
+  sectionTitle: { fontSize: 18, marginBottom: 12 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  clearText: { fontSize: 13 },
+  categoriesScroll: { marginBottom: 24, overflow: 'visible' },
+  favoritesScroll: { marginBottom: 24 },
+  favCard: { width: 300, marginRight: 0 },
+  chipsScroll: { marginBottom: 4 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  chipText: { fontSize: 13 },
+  list: { marginTop: 4 },
+  empty: { alignItems: 'center', paddingVertical: 48, gap: 10 },
+  emptyTitle: { fontSize: 17 },
+  emptyBody: { fontSize: 13, textAlign: 'center' },
 });
