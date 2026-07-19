@@ -108,5 +108,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Force PKCE flow so signInWithOAuth always redirects with ?code=xxx
+    // rather than implicit-flow tokens (#access_token=...) in the hash.
+    // Without this, Supabase defaults to implicit flow on mobile and the
+    // PKCE exchange fails with "no code returned".
+    flowType: 'pkce',
   },
 });

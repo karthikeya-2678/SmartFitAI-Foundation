@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { authService } from '@/services/auth.service';
+import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -172,20 +173,47 @@ export function useSignInWithGoogle() {
       const queryParams = new URLSearchParams(queryPart);
       const hashParams = new URLSearchParams(hashPart);
 
-      let code = queryParams.get('code') ?? hashParams.get('code') ?? null;
+      const code = queryParams.get('code') ?? hashParams.get('code') ?? null;
 
-      if (!code) {
-        // Supabase may have redirected with an error.
-        const errorDescription =
-          queryParams.get('error_description') ??
-          hashParams.get('error_description') ??
-          null;
-        throw new Error(errorDescription ?? 'Google sign-in failed: no code returned');
+      // ── PKCE flow (primary): ?code=xxx ────────────────────────────────────
+      // ── Implicit flow (fallback): #access_token=xxx&refresh_token=xxx ─────
+      //
+      // With flowType:'pkce' set on the Supabase client, Supabase should always
+      // redirect with ?code=xxx. The implicit-flow fallback handles edge cases
+      // where the Supabase project is still configured for implicit flow, or
+      // where an older cached OAuth URL without a PKCE challenge is used.
+
+      let session: import('@supabase/supabase-js').Session | null = null;
+
+      if (code) {
+        // PKCE: exchange the authorization code for a session.
+        const result = await authService.exchangeGoogleCode(code);
+        session = result.session;
+      } else {
+        // Check for implicit-flow tokens in the URL hash / query.
+        const accessToken =
+          hashParams.get('access_token') ?? queryParams.get('access_token') ?? null;
+        const refreshToken =
+          hashParams.get('refresh_token') ?? queryParams.get('refresh_token') ?? null;
+
+        if (accessToken && refreshToken) {
+          // Set the session directly from the tokens Supabase returned.
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) throw error;
+          session = data.session;
+        } else {
+          // Neither code nor tokens found — surface the error Supabase sent, or
+          // a generic message so the user sees something actionable.
+          const errorDescription =
+            queryParams.get('error_description') ??
+            hashParams.get('error_description') ??
+            null;
+          throw new Error(errorDescription ?? 'Google sign-in failed: no code returned');
+        }
       }
-
-      // Exchange the code for a Supabase session (PKCE verifier was stored
-      // in storage by supabase-js during step 1).
-      const { session } = await authService.exchangeGoogleCode(code);
 
       if (!session) {
         throw new Error('Google sign-in failed: no session returned after code exchange');
